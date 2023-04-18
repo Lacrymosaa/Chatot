@@ -1,40 +1,30 @@
+import requests
 import tkinter as tk
 from tkinter import ttk
-import spotipy
-from spotipy.oauth2 import SpotifyOAuth
 import webbrowser
 
-def search_tracks(keyword, client_id, client_secret):
-    sp_auth = SpotifyOAuth(
-        client_id=client_id,
-        client_secret=client_secret,
-        redirect_uri="http://localhost:8888/callback",
-        scope="user-library-read user-read-private"
-    )
-    
-    token = sp_auth.get_access_token(as_dict=False)
-    sp = spotipy.Spotify(auth=token)
-    
-    results = sp.search(q=keyword, type='track')
-    tracks = results['tracks']['items']
+def search_tracks(keyword):
+    response = requests.get(f"https://api.deezer.com/search?q={keyword}")
+    tracks = response.json()["data"]
     
     track_list = []
     for track in tracks:
         track_info = {
-            'name': track['name'],
-            'artist': track['artists'][0]['name'],
-            'url': track['external_urls']['spotify']
+            'name': track['title'],
+            'artist': track['artist']['name'],
+            'url': track['link']
         }
         track_list.append(track_info)
     
     return track_list
+
 
 class MusicSearcher(tk.Frame):
     def __init__(self, master=None):
         super().__init__(master)
         self.master = master
         self.master.title("Chatot")
-        self.master.iconbitmap("imgs/chatot.ico")
+        self.master.iconbitmap("chatot.ico")
         self.pack()
         self.create_widgets()
 
@@ -55,11 +45,15 @@ class MusicSearcher(tk.Frame):
         self.track_table.column('name', width=200)
         self.track_table.column('artist', width=200)
         self.track_table.column('url', width=300)
+        # Cria uma barra de rolagem e vincula-a à tabela
+        scroll = ttk.Scrollbar(self, orient="vertical", command=self.track_table.yview)
+        self.track_table.configure(yscrollcommand=scroll.set)
+        scroll.grid(row=1, column=3, sticky="ns")
         self.track_table.grid(row=1, column=0, columnspan=3)
 
 
         # Bind de evento para abrir a URL correspondente no navegador ao clicar na coluna 'url'
-        self.track_table.bind("<Button-1>", self.on_item_click)
+        self.track_table.bind("<Button-1>", self.on_item_click)  
 
     def on_item_click(self, event):
             item_id = self.track_table.identify_row(event.y)
@@ -70,9 +64,7 @@ class MusicSearcher(tk.Frame):
 
     def search(self):
         keyword = self.key_entry.get()
-        client_id = open('id.txt', 'r').read().strip()
-        client_secret = open('secret.txt', 'r').read().strip()
-        track_list = search_tracks(keyword, client_id, client_secret)
+        track_list = search_tracks(keyword)
 
         self.track_table.delete(*self.track_table.get_children())
         for track in track_list:
